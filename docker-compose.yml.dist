@@ -1,0 +1,104 @@
+# =============================================================================
+# SEGINTEC - Campus Virtual (Moodle LTS)
+# =============================================================================
+# Requisitos: Docker 20.10+, Docker Compose 2.x
+# VPS: 2 vCPU / 4 GB RAM / SSD (Ubuntu 22.04)
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:15-alpine
+    container_name: segintec_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - segintec_pgdata:/var/lib/postgresql/data
+    networks:
+      - segintec_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Moodle 4.1 LTS
+  # ---------------------------------------------------------------------------
+  moodle:
+    image: bitnami/moodle:4.1
+    container_name: segintec_moodle
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MOODLE_DATABASE_TYPE: pgsql
+      MOODLE_DATABASE_HOST: db
+      MOODLE_DATABASE_PORT_NUMBER: 5432
+      MOODLE_DATABASE_NAME: ${DB_NAME}
+      MOODLE_DATABASE_USER: ${DB_USER}
+      MOODLE_DATABASE_PASSWORD: ${DB_PASSWORD}
+      MOODLE_SITE_NAME: ${MOODLE_SITE_NAME}
+      MOODLE_LANG: ${MOODLE_LANG:-es}
+      MOODLE_USERNAME: ${MOODLE_ADMIN_USER}
+      MOODLE_PASSWORD: ${MOODLE_ADMIN_PASSWORD}
+      MOODLE_EMAIL: ${MOODLE_ADMIN_EMAIL}
+      MOODLE_HOST: ${MOODLE_DOMAIN}
+      MOODLE_REVERSEPROXY: "true"
+      MOODLE_SSLPROXY: "true"
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-256M}
+      PHP_POST_MAX_SIZE: ${PHP_POST_MAX_SIZE:-100M}
+      PHP_UPLOAD_MAX_FILESIZE: ${PHP_UPLOAD_MAX_FILESIZE:-100M}
+      PHP_MAX_EXECUTION_TIME: ${PHP_MAX_EXECUTION_TIME:-300}
+      PHP_MAX_INPUT_VARS: ${PHP_MAX_INPUT_VARS:-5000}
+      TZ: ${TIMEZONE:-America/Mexico_City}
+      BITNAMI_DEBUG: "false"
+    volumes:
+      - segintec_moodle:/bitnami/moodle
+      - segintec_moodledata:/bitnami/moodledata
+    networks:
+      - segintec_net
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login/index.php"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 180s
+
+  # ---------------------------------------------------------------------------
+  # Nginx Proxy Manager (SSL + Let's Encrypt)
+  # ---------------------------------------------------------------------------
+  proxy:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: segintec_proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"
+    environment:
+      TZ: ${TIMEZONE:-America/Mexico_City}
+    volumes:
+      - segintec_npm:/data
+      - segintec_certs:/etc/letsencrypt
+    networks:
+      - segintec_net
+
+volumes:
+  segintec_pgdata:
+  segintec_moodle:
+  segintec_moodledata:
+  segintec_npm:
+  segintec_certs:
+
+networks:
+  segintec_net:
