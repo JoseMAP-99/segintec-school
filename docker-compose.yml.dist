@@ -40,7 +40,19 @@ services:
       db:
         condition: service_healthy
     environment:
+      # -----------------------------------------------------------------------
+      # URL del sitio - Cambiar según el entorno:
+      #   - Desarrollo: http://localhost:8080
+      #   - Producción: https://tu-dominio.com
+      # -----------------------------------------------------------------------
       MOODLE_URL: http://localhost:8080
+      # -----------------------------------------------------------------------
+      # SSL Proxy - Descomentar SOLO si usas HTTPS con reverse proxy (Nginx)
+      # Esto activa $CFG->sslproxy = true en Moodle para evitar bucles de
+      # redirección cuando el proxy maneja SSL y Moodle recibe HTTP interno.
+      # -----------------------------------------------------------------------
+      # MOODLE_SSL: "true"
+      # -----------------------------------------------------------------------
       MOODLE_ADMIN: ${MOODLE_ADMIN_USER}
       MOODLE_ADMIN_PASSWORD: ${MOODLE_ADMIN_PASSWORD}
       MOODLE_ADMIN_EMAIL: ${MOODLE_ADMIN_EMAIL}
